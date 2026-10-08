@@ -139,7 +139,7 @@ app.delete('/api/library/:docId', authMiddleware, async (req, res) => {
 });
 
 // ============================================================
-// CATALOG MANAGEMENT
+// CATALOG MANAGEMENT (staff only — add/edit/delete)
 // ============================================================
 
 app.get('/api/catalog', authMiddleware, async (req, res) => {
@@ -180,6 +180,111 @@ app.delete('/api/catalog/:isbn', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('[CATALOG]', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// PUBLIC BOOK ROUTES — for the customer website (no auth)
+// ============================================================
+
+/** Formats a Firestore book document into the shape the customer website expects. */
+function formatBookForSite(isbn, d) {
+  return {
+    isbn,
+    title: d.title || 'Unknown Title',
+    author: d.author || 'Unknown Author',
+    summary: d.description || d.fullDescription || 'No description available',
+    description: d.fullDescription || d.description || 'No description available',
+    hasFullDescription: !!d.fullDescription && d.fullDescription !== d.description,
+    coverUrl: d.coverImage || null,
+    rating: d.averageRating || null,
+    pages: d.pageCount || null,
+    tags: Array.isArray(d.categories)
+      ? d.categories.map((label) => ({ label }))
+      : [],
+    sentiment: typeof d.sentimentScore === 'number'
+      ? Math.round(d.sentimentScore * 100)
+      : 0,
+    sentimentLabel: d.sentimentLabel || 'Neutral',
+    sentimentBasis: d.sentimentSource || 'summary',
+    reviewExcerpt: d.reviewExcerpt || '',
+    reviewSource: d.reviewSource || '',
+    reviewUrl: d.reviewUrl || '',
+  };
+}
+
+/* GET /api/books/catalog — public, for the customer website's Browse Catalog */
+app.get('/api/books/catalog', async (req, res) => {
+  try {
+    const snapshot = await db
+      .collection('book_catalog')
+      .orderBy('addedAt', 'desc')
+      .get();
+
+    const books = snapshot.docs.map((doc) =>
+      formatBookForSite(doc.id, doc.data())
+    );
+
+    res.json({ success: true, data: books });
+  } catch (err) {
+    console.error('[BOOKS] catalog error:', err.message);
+    res.status(500).json({ success: false, message: 'Could not load catalog' });
+  }
+});
+
+/* GET /api/books/scan/:isbn — public lookup by ISBN */
+app.get('/api/books/scan/:isbn', async (req, res) => {
+  try {
+    const doc = await db.collection('book_catalog').doc(req.params.isbn).get();
+
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Book not in shared catalog yet. Scan it in the app first.',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: formatBookForSite(doc.id, doc.data()),
+    });
+  } catch (err) {
+    console.error('[BOOKS] scan error:', err.message);
+    res.status(500).json({ success: false, message: 'Could not look up book' });
+  }
+});
+
+/* POST /api/books/library — public, checks in a book at a table */
+app.post('/api/books/library', async (req, res) => {
+  const { tableNumber, isbn, bookTitle } = req.body;
+  if (!tableNumber || !bookTitle) {
+    return res.status(400).json({
+      success: false,
+      message: 'tableNumber and bookTitle required',
+    });
+  }
+
+  try {
+    const existing = await db
+      .collection('library_checkins')
+      .where('tableNumber', '==', Number(tableNumber))
+      .get();
+
+    const batch = db.batch();
+    existing.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+
+    await db.collection('library_checkins').add({
+      tableNumber: Number(tableNumber),
+      isbn: isbn || 'UNKNOWN',
+      title: bookTitle,
+      checkedInAt: new Date(),
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[BOOKS] library error:', err.message);
+    res.status(500).json({ success: false, message: 'Could not check in book' });
   }
 });
 
