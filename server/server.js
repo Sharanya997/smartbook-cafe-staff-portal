@@ -1,11 +1,10 @@
+import './config/env.js';   // ← must be first (loads .env before anything else)
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { db } from './firebase-admin.js';
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,8 +14,6 @@ const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
-
-// Serve the frontend from /public
 app.use(express.static(join(__dirname, '..', 'public')));
 
 // ============================================================
@@ -72,7 +69,7 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
       .filter((o) => o.status === 'pending' || o.status === 'preparing');
     res.json({ orders });
   } catch (err) {
-    console.error(err);
+    console.error('[ORDERS]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -92,7 +89,7 @@ app.patch('/api/orders/:id/status', authMiddleware, async (req, res) => {
     });
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    console.error('[ORDERS]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -114,7 +111,7 @@ app.get('/api/library', authMiddleware, async (req, res) => {
     });
     res.json({ checkins });
   } catch (err) {
-    console.error(err);
+    console.error('[LIBRARY]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -124,7 +121,7 @@ app.delete('/api/library/:docId', authMiddleware, async (req, res) => {
     await db.collection('library_checkins').doc(req.params.docId).delete();
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    console.error('[LIBRARY]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -143,7 +140,7 @@ app.get('/api/catalog', authMiddleware, async (req, res) => {
     }));
     res.json({ books });
   } catch (err) {
-    console.error(err);
+    console.error('[CATALOG]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -159,7 +156,7 @@ app.post('/api/catalog', authMiddleware, async (req, res) => {
     );
     res.json({ success: true, isbn: book.isbn });
   } catch (err) {
-    console.error(err);
+    console.error('[CATALOG]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -169,7 +166,7 @@ app.delete('/api/catalog/:isbn', authMiddleware, async (req, res) => {
     await db.collection('book_catalog').doc(req.params.isbn).delete();
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    console.error('[CATALOG]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -197,7 +194,7 @@ app.get('/api/stats', authMiddleware, async (req, res) => {
       catalogSize: catalogSnap.size,
     });
   } catch (err) {
-    console.error(err);
+    console.error('[STATS]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
