@@ -12,7 +12,19 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://smartbook-cafe.onrender.com',
+    'https://smartbook-cafe-staff-portal.onrender.com',
+    'http://localhost:3000',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'http://127.0.0.1:3000',
+  ],
+  allowedHeaders: ['Content-Type', 'x-staff-token'],
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+}));
+
 app.use(express.json());
 app.use(express.static(join(__dirname, '..', 'public')));
 
